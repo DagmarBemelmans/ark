@@ -18,6 +18,7 @@ use ark::console::SessionMode;
 use ark::logger;
 use ark::repos::DefaultRepos;
 use ark::signals::initialize_signal_block;
+use ark::standalone_lsp;
 use ark::start::start_kernel;
 use ark::traps::register_trap_handlers;
 use crossbeam::channel::unbounded;
@@ -34,6 +35,7 @@ fn print_usage() {
     print!(
         r#"
 Usage: ark [OPTIONS]
+       ark lsp [OPTIONS]     Run the standalone LSP server over stdio (see `ark lsp --help`)
 
 Available options:
 
@@ -81,6 +83,13 @@ fn main() -> anyhow::Result<()> {
 
     // Block signals in this thread (and any child threads).
     initialize_signal_block();
+
+    // Dispatch the `lsp` subcommand from the very first argument, before the
+    // general flag loop below. Keeping this ahead of the loop leaves the
+    // kernel's existing flag handling (e.g. `--connection_file`) untouched.
+    if std::env::args().nth(1).as_deref() == Some("lsp") {
+        return run_lsp_subcommand(std::env::args().skip(2).collect());
+    }
 
     // Get an iterator over all the command-line arguments
     let mut argv = std::env::args();
@@ -467,6 +476,24 @@ fn main() -> anyhow::Result<()> {
 
     // Just to please Rust
     Ok(())
+}
+
+// Handle the `ark lsp` subcommand: parse its arguments, initialize the logger,
+// and hand off to the standalone LSP entry point. On `Err`, the message is
+// printed to stderr and the process exits with a non-zero code.
+fn run_lsp_subcommand(args: Vec<String>) -> anyhow::Result<()> {
+    match standalone_lsp::parse_args(args)? {
+        standalone_lsp::ParsedArgs::Help => {
+            standalone_lsp::print_help();
+            Ok(())
+        },
+        standalone_lsp::ParsedArgs::Options(options) => {
+            // In `lsp` mode stdout carries the LSP frames, so logs must never
+            // go there. The logger defaults to stderr when no file is given.
+            logger::init(options.log_file.as_deref(), None);
+            standalone_lsp::run(options)
+        },
+    }
 }
 
 // Install the kernelspec JSON file into one of Jupyter's search paths.

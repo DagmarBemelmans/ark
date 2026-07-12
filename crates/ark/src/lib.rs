@@ -39,6 +39,7 @@ pub mod reticulate;
 pub mod shell;
 pub mod signals;
 pub mod srcref;
+pub mod standalone_lsp;
 pub mod start;
 pub mod startup;
 pub mod strings;

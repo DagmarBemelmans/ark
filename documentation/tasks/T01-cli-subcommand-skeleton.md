@@ -1,6 +1,6 @@
 # T01 — `ark lsp` CLI subcommand skeleton
 
-- **Status:** Blocked on decision 0003
+- **Status:** Delegated (2026-07-12)
 - **Risk:** low · **Size:** small (~1h)
 - **Depends on:** decision [0003](../decisions/0003-ark-lsp-subcommand.md)
 

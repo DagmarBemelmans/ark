@@ -7,8 +7,8 @@ Each `TNN-*.md` file is a **self-contained brief** for an implementer model
 
 | # | Task | Depends on | Risk | Status |
 |---|---|---|---|---|
-| T00 | [Environment & baseline](T00-environment-and-baseline.md) | — | low | Ready (Dagmar + Claude, not delegated) |
-| T01 | [`ark lsp` CLI skeleton](T01-cli-subcommand-skeleton.md) | ~~0003 accepted~~ ✓ | low | Ready |
+| T00 | [Environment & baseline](T00-environment-and-baseline.md) | — | low | Done (Zed REPL check skipped) |
+| T01 | [`ark lsp` CLI skeleton](T01-cli-subcommand-skeleton.md) | ~~0003 accepted~~ ✓ | low | In review |
 | T02 | [Sidecar kernel boot](T02-sidecar-kernel-boot.md) | T01, ~~0002 accepted~~ ✓ | **high** | Blocked on T01 |
 | T03 | [LSP comm + TCP connect](T03-lsp-comm-and-tcp-connect.md) | T02 | medium | Blocked |
 | T04 | [stdio bridge + lifecycle](T04-stdio-bridge-and-lifecycle.md) | T03 | medium | Blocked |

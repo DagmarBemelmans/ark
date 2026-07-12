@@ -1,6 +1,6 @@
 # T00 — Environment & baseline (Dagmar + Claude, not delegated)
 
-- **Status:** Ready
+- **Status:** Done (2026-07-12; Zed REPL check skipped)
 - **Goal:** prove the toolchain, the build, the tests, and "ark already runs R in Zed"
   before we change anything. Also: first guided tour of the codebase.
 
@@ -37,6 +37,18 @@
 
 ## Done when
 
-- [ ] `cargo build` and the LSP test slice pass locally
-- [ ] Zed REPL executed R code through ark
-- [ ] Decisions 0002–0005 each say Accepted or have review comments
+- [x] `cargo build` and the LSP test slice pass locally
+- [ ] Zed REPL executed R code through ark — *skipped by Dagmar (kernelspec install declined); kernel boot is covered by the integration tests*
+- [x] Decisions 0002–0005 each say Accepted or have review comments
+
+## Outcome (2026-07-12)
+
+- Toolchain: rustc 1.96.1, cargo 1.96.1, nextest 0.9.114, just 1.43.1 — all present.
+  All eight R test packages already installed.
+- `just test -p ark lsp` initially failed (28 of 363): R's `libR.so` (from
+  nixpkgs-unstable, built against glibc 2.41) could not be dlopen'd into ark
+  binaries linked against the system's glibc 2.40 — one process cannot mix two
+  glibc generations. Fixed in `~/nixos-config`: system flake upgraded NixOS
+  25.11 → 26.05 (glibc 2.42) and R moved from `unstable.rWrapper` to the base
+  nixpkgs (R 4.6.0 → 4.5.3) so ark and R always share one glibc. After
+  `cargo clean && cargo build`, 363/363 pass.
