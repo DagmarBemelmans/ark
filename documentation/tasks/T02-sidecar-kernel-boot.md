@@ -1,6 +1,6 @@
 # T02 — Sidecar kernel boot (spawn self as kernel, handshake)
 
-- **Status:** Blocked on decision 0002 + T01
+- **Status:** In review (2026-07-12)
 - **Risk:** **high** (most unknowns live here) · **Size:** large (split further if needed)
 - **Depends on:** T01, decision [0002](../decisions/0002-sidecar-kernel-architecture.md)
 
@@ -57,7 +57,9 @@ this task, the bridge can talk Jupyter to a live R session. (LSP comes in T03.)
 
 ```sh
 cargo build
-./target/debug/ark lsp --log /tmp/ark-lsp.log   # starts, logs kernel ready; Ctrl-D exits cleanly
+# NOTE: ark's own logs default to ERROR level, so "kernel ready" is only *visible*
+# with RUST_LOG=ark=info. The bridge boots and exits correctly without it.
+RUST_LOG=ark=info ./target/debug/ark lsp --log /tmp/ark-lsp.log   # logs kernel ready; Ctrl-D exits cleanly
 ps aux | rg '[a]rk'                             # no orphans after exit
 just test -p ark sidecar
 just clippy && cargo +nightly fmt --all

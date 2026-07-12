@@ -46,6 +46,7 @@ mod plots;
 mod repos_auto;
 mod repos_conf_file;
 mod rstudioapi;
+mod sidecar;
 mod stack;
 mod stream_filter;
 mod ui_prompt_state;

@@ -5,7 +5,11 @@
 //
 //
 
+use std::io::Read;
+
 use anyhow::anyhow;
+
+mod sidecar;
 
 /// Parsed options for the `ark lsp` subcommand.
 pub struct Options {
@@ -64,11 +68,37 @@ pub fn parse_args(args: Vec<String>) -> anyhow::Result<ParsedArgs> {
 
 /// Run the standalone LSP server.
 ///
-/// Not implemented yet; this is the recognized entry point that later tasks
-/// will build the bridge logic on top of.
+/// Boots a full ark kernel as a child process and connects to it as a minimal
+/// Jupyter frontend. The LSP wiring lands in a later task; for now the bridge
+/// simply keeps the kernel alive until stdin reaches EOF, then shuts it down
+/// cleanly.
 pub fn run(options: Options) -> anyhow::Result<()> {
-    let _ = options;
-    Err(anyhow!("ark lsp is not implemented yet"))
+    let mut sidecar = sidecar::Sidecar::boot(options.log_file.as_deref())?;
+    log::info!("kernel ready (kernel pid: {})", sidecar.child_pid());
+
+    // With no LSP frames to serve yet, block until the frontend closes our
+    // stdin, discarding anything sent in the meantime.
+    wait_for_stdin_eof();
+
+    log::info!("stdin closed; shutting down kernel");
+    sidecar.shutdown()
+}
+
+/// Block until stdin reaches EOF, discarding any bytes read.
+fn wait_for_stdin_eof() {
+    let mut stdin = std::io::stdin().lock();
+    let mut buffer = [0u8; 4096];
+
+    loop {
+        match stdin.read(&mut buffer) {
+            Ok(0) => return,
+            Ok(_) => continue,
+            Err(err) => {
+                log::warn!("Error reading stdin: {err:?}");
+                return;
+            },
+        }
+    }
 }
 
 /// Print usage for the `ark lsp` subcommand to stdout.
