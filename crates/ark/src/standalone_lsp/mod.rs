@@ -5,12 +5,12 @@
 //
 //
 
-use std::io::Read;
 use std::time::Duration;
 
 use anyhow::anyhow;
 
 mod lsp_connection;
+mod pump;
 mod sidecar;
 
 /// How long to wait for the kernel to start its LSP server and report the port.
@@ -75,10 +75,9 @@ pub fn parse_args(args: Vec<String>) -> anyhow::Result<ParsedArgs> {
 /// Run the standalone LSP server.
 ///
 /// Boots a full ark kernel as a child process, connects to it as a minimal
-/// Jupyter frontend, and starts ark's LSP server inside it over TCP. Bridging
-/// Zed's stdio to that TCP stream lands in a later task; for now the bridge
-/// holds the stream and keeps the kernel alive until stdin reaches EOF, then
-/// shuts down cleanly.
+/// Jupyter frontend, starts ark's LSP server inside it over TCP, and then pumps
+/// bytes between the editor's stdio and that stream until either side closes.
+/// On exit the kernel is shut down cleanly, so the child never outlives us.
 pub fn run(options: Options) -> anyhow::Result<()> {
     let mut sidecar = sidecar::Sidecar::boot(options.log_file.as_deref())?;
     log::info!("kernel ready (kernel pid: {})", sidecar.child_pid());
@@ -89,32 +88,24 @@ pub fn run(options: Options) -> anyhow::Result<()> {
         Err(err) => log::info!("lsp connected (port unknown: {err:?})"),
     }
 
-    // With nothing yet bridging Zed's stdio to the LSP stream, block until the
-    // frontend closes our stdin, discarding anything sent in the meantime.
-    wait_for_stdin_eof();
+    // Bridge the editor's stdio to the LSP stream and wait for either side to
+    // close: stdin EOF (the editor closed us) or the TCP stream closing (the
+    // LSP server exited).
+    let bridge = pump::Bridge::start(lsp_stream)?;
+    log::info!("bridge running");
+    let ending = bridge.wait();
 
-    // Shut down in reverse order of setup: drop the LSP stream first, then the
-    // kernel sidecar.
-    log::info!("stdin closed; shutting down kernel");
-    drop(lsp_stream);
-    sidecar.shutdown()
-}
+    // Ask the kernel to stop. For a stdin EOF this closes the LSP stream, which
+    // lets the still-running stdout pump drain; for a TCP close the pump has
+    // already finished. Either way the kernel child is reaped here.
+    log::info!("bridge ending after {ending:?}; shutting down kernel");
+    let shutdown_result = sidecar.shutdown();
 
-/// Block until stdin reaches EOF, discarding any bytes read.
-fn wait_for_stdin_eof() {
-    let mut stdin = std::io::stdin().lock();
-    let mut buffer = [0u8; 4096];
+    // Flush any trailing bytes to stdout before exiting. The blocked stdin pump,
+    // if any, is reaped when the process exits.
+    bridge.shutdown();
 
-    loop {
-        match stdin.read(&mut buffer) {
-            Ok(0) => return,
-            Ok(_) => continue,
-            Err(err) => {
-                log::warn!("Error reading stdin: {err:?}");
-                return;
-            },
-        }
-    }
+    shutdown_result
 }
 
 /// Print usage for the `ark lsp` subcommand to stdout.

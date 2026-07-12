@@ -2,6 +2,11 @@
 
 # 0.1.9000
 
+## 2026-07
+
+- LSP: Added an `ark lsp` subcommand that runs the R language server as a standalone stdio process, bridging an editor's stdio to a sidecar kernel's LSP over TCP so ark can be used from Zed and other LSP clients.
+
+
 ## 2026-03
 
 - Jupyter: `kernel_info_reply` now includes the mandatory `implementation` and `implementation_version` fields, which should allow ark to run in Zed (#1094).

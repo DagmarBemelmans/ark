@@ -1,6 +1,6 @@
 # T03 — Open the LSP comm and connect over TCP
 
-- **Status:** Delegated (2026-07-12)
+- **Status:** Done (2026-07-12, committed `94ce68ac`)
 - **Risk:** medium · **Size:** medium (~2h)
 - **Depends on:** T02
 

@@ -50,5 +50,6 @@ Rules:
   decisions 0002–0005 are **Proposed and waiting for Dagmar's review**.
 - 2026-07-12 — Decisions 0002–0005 **Accepted**. T00 done. T01 (`ark lsp`
   skeleton) implemented and committed (`40f96503`). T02 (sidecar kernel boot)
-  **Done** (committed `04f70346`). T03 (LSP comm + TCP connect) **delegated**
-  to an implementer.
+  **Done** (committed `04f70346`). T03 (LSP comm + TCP connect) **Done**
+  (committed `94ce68ac`). T04 (stdio bridge + lifecycle) **delegated** to an
+  implementer.

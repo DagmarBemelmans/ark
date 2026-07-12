@@ -1,6 +1,6 @@
 # T04 — stdio↔TCP pump and full lifecycle
 
-- **Status:** Blocked on T03
+- **Status:** Delegated (2026-07-12)
 - **Risk:** medium · **Size:** medium (~2-3h)
 - **Depends on:** T03
 
@@ -24,7 +24,7 @@ task, any stdio LSP client can use ark — Zed included, but also a test script.
   |---|---|
   | stdin EOF (editor closed us) | stop pumps, sidecar shutdown (T02), exit 0 |
   | TCP closed by kernel (LSP `exit`) | flush remaining bytes to stdout, sidecar shutdown, exit 0 |
-  | child kernel died unexpectedly | error to stderr + log, exit non-zero |
+  | child kernel died unexpectedly | Death during boot/connect: error to stderr + log, exit non-zero. **v1 limitation (accepted 2026-07-12):** a crash *after* the LSP is connected closes the TCP identically to a clean LSP `exit`, so the bridge exits 0. Distinguishing them means surfacing the child's exit status from the sidecar — deferred; no orphan risk (the `PR_SET_PDEATHSIG` backstop still applies). |
   | SIGTERM/SIGINT | same as stdin EOF; note `crates/ark/src/signals.rs` blocks signals in kernel threads — check what applies to the bridge process before installing handlers |
 
 ## Requirements

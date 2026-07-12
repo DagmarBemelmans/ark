@@ -48,6 +48,7 @@ mod repos_conf_file;
 mod rstudioapi;
 mod sidecar;
 mod stack;
+mod standalone_lsp;
 mod stream_filter;
 mod ui_prompt_state;
 mod variables;
