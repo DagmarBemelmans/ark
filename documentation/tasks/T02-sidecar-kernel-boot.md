@@ -1,6 +1,6 @@
 # T02 — Sidecar kernel boot (spawn self as kernel, handshake)
 
-- **Status:** In review (2026-07-12)
+- **Status:** Done (2026-07-12, committed `04f70346`)
 - **Risk:** **high** (most unknowns live here) · **Size:** large (split further if needed)
 - **Depends on:** T01, decision [0002](../decisions/0002-sidecar-kernel-architecture.md)
 

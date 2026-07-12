@@ -29,7 +29,14 @@ use std::process::Command;
 use std::process::Stdio;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering;
+use std::sync::mpsc::channel;
+use std::sync::mpsc::Receiver;
+use std::sync::mpsc::RecvTimeoutError;
+use std::sync::mpsc::Sender;
 use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::MutexGuard;
+use std::sync::PoisonError;
 use std::thread::JoinHandle;
 use std::time::Duration;
 use std::time::Instant;
@@ -40,6 +47,7 @@ use amalthea::registration_file::RegistrationFile;
 use amalthea::socket::Socket;
 use amalthea::wire::jupyter_message::JupyterMessage;
 use amalthea::wire::jupyter_message::Message;
+use amalthea::wire::jupyter_message::ProtocolMessage;
 use amalthea::wire::shutdown_request::ShutdownRequest;
 use anyhow::Context;
 use tempfile::TempDir;
@@ -51,6 +59,11 @@ const IOPUB_POLL_MS: i64 = 250;
 /// Total budget for a graceful shutdown: waiting for the kernel's shutdown
 /// reply and for the child process to exit, before we resort to `kill()`.
 const SHUTDOWN_BUDGET: Duration = Duration::from_secs(5);
+
+/// Shared slot the iopub drain thread checks on every message: when a
+/// subscription is active it holds the channel to forward messages onto,
+/// otherwise the message is discarded.
+type IopubSubscriber = Arc<Mutex<Option<Sender<Message>>>>;
 
 /// A running ark kernel child process and the frontend connection to it.
 ///
@@ -64,11 +77,18 @@ pub struct Sidecar {
     /// receive its reply.
     control_socket: Socket,
 
-    /// The remaining frontend sockets. We don't use them in this task, but we
-    /// keep them alive so the full Jupyter connection stays established.
-    _shell_socket: Socket,
+    /// The shell socket, used to open the LSP comm inside the kernel.
+    shell_socket: Socket,
+
+    /// The remaining frontend sockets. We don't use them, but we keep them
+    /// alive so the full Jupyter connection stays established.
     _stdin_socket: Socket,
     _heartbeat_socket: Socket,
+
+    /// While a subscription is active, the drain thread forwards iopub messages
+    /// here instead of discarding them. Used briefly while opening the LSP comm
+    /// and reading back the `server_started` port.
+    iopub_subscriber: IopubSubscriber,
 
     /// The kernel child process.
     child: Child,
@@ -158,13 +178,20 @@ impl Sidecar {
         let heartbeat_socket = frontend.heartbeat_socket;
 
         // A full iopub queue freezes the kernel (bounded channels, see
-        // `start.rs`), so drain it continuously on a background thread.
+        // `start.rs`), so drain it continuously on a background thread. The
+        // drain forwards messages to a subscriber when one is registered, and
+        // discards them otherwise.
         let drain_stop = Arc::new(AtomicBool::new(false));
-        let drain_thread = spawn_iopub_drain(iopub_socket, Arc::clone(&drain_stop));
+        let iopub_subscriber: IopubSubscriber = Arc::new(Mutex::new(None));
+        let drain_thread = spawn_iopub_drain(
+            iopub_socket,
+            Arc::clone(&drain_stop),
+            Arc::clone(&iopub_subscriber),
+        );
 
         Ok(Self {
             control_socket,
-            _shell_socket: shell_socket,
+            shell_socket,
             _stdin_socket: stdin_socket,
             _heartbeat_socket: heartbeat_socket,
             child,
@@ -172,6 +199,7 @@ impl Sidecar {
             _connection_dir: connection_dir,
             drain_stop,
             drain_thread: Some(drain_thread),
+            iopub_subscriber,
             shut_down: false,
         })
     }
@@ -179,6 +207,29 @@ impl Sidecar {
     /// The kernel child's process id.
     pub fn child_pid(&self) -> u32 {
         self.child_pid
+    }
+
+    /// Send a Jupyter protocol message to the kernel on the shell socket.
+    pub fn send_shell<T: ProtocolMessage>(&self, message: T) -> anyhow::Result<()> {
+        JupyterMessage::create(message, None, &self.shell_socket.session)
+            .send(&self.shell_socket)
+            .context("Failed to send message on shell socket")
+    }
+
+    /// Temporarily route iopub messages to the caller instead of discarding
+    /// them.
+    ///
+    /// While the returned [`IopubSubscription`] is alive, the drain thread
+    /// hands every iopub message to it; dropping it restores draining. Only one
+    /// subscription is meaningful at a time.
+    pub fn subscribe_iopub(&self) -> IopubSubscription {
+        let (tx, rx) = channel();
+        *lock_subscriber(&self.iopub_subscriber) = Some(tx);
+
+        IopubSubscription {
+            rx,
+            subscriber: Arc::clone(&self.iopub_subscriber),
+        }
     }
 
     /// Shut the kernel down cleanly.
@@ -311,13 +362,18 @@ where
     });
 }
 
-/// Continuously receive and discard iopub messages until signalled to stop.
-fn spawn_iopub_drain(iopub_socket: Socket, stop: Arc<AtomicBool>) -> JoinHandle<()> {
+/// Continuously receive iopub messages until signalled to stop, forwarding
+/// each to the active subscriber or discarding it.
+fn spawn_iopub_drain(
+    iopub_socket: Socket,
+    stop: Arc<AtomicBool>,
+    subscriber: IopubSubscriber,
+) -> JoinHandle<()> {
     stdext::spawn!("sidecar-iopub-drain", move || {
         while !stop.load(Ordering::Relaxed) {
             match iopub_socket.poll_incoming(IOPUB_POLL_MS) {
                 Ok(true) => match Message::read_from_socket(&iopub_socket) {
-                    Ok(message) => log::trace!("Draining iopub message: {message:?}"),
+                    Ok(message) => dispatch_iopub_message(&subscriber, message),
                     Err(err) => log::trace!("Error reading iopub message: {err:?}"),
                 },
                 Ok(false) => {},
@@ -328,6 +384,22 @@ fn spawn_iopub_drain(iopub_socket: Socket, stop: Arc<AtomicBool>) -> JoinHandle<
             }
         }
     })
+}
+
+/// Hand `message` to the active subscriber, or discard it if there is none.
+fn dispatch_iopub_message(subscriber: &IopubSubscriber, message: Message) {
+    match lock_subscriber(subscriber).as_ref() {
+        Some(tx) => {
+            let _ = tx.send(message);
+        },
+        None => log::trace!("Draining iopub message: {message:?}"),
+    }
+}
+
+/// Lock the subscriber slot, recovering the guard even if a previous holder
+/// panicked. The slot holds no invariant worth propagating a poison for.
+fn lock_subscriber(subscriber: &IopubSubscriber) -> MutexGuard<'_, Option<Sender<Message>>> {
+    subscriber.lock().unwrap_or_else(PoisonError::into_inner)
 }
 
 /// Poll the control socket for the kernel's `shutdown_reply`, up to `deadline`.
@@ -372,5 +444,27 @@ impl Drop for ChildGuard {
             let _ = child.kill();
             let _ = child.wait();
         }
+    }
+}
+
+/// A temporary lease on the sidecar's iopub stream.
+///
+/// While alive, the drain thread forwards iopub messages here instead of
+/// discarding them. Dropping it restores draining.
+pub struct IopubSubscription {
+    rx: Receiver<Message>,
+    subscriber: IopubSubscriber,
+}
+
+impl IopubSubscription {
+    /// Wait up to `timeout` for the next iopub message.
+    pub fn recv_timeout(&self, timeout: Duration) -> Result<Message, RecvTimeoutError> {
+        self.rx.recv_timeout(timeout)
+    }
+}
+
+impl Drop for IopubSubscription {
+    fn drop(&mut self) {
+        *lock_subscriber(&self.subscriber) = None;
     }
 }

@@ -1,6 +1,6 @@
 # T03 — Open the LSP comm and connect over TCP
 
-- **Status:** Blocked on T02
+- **Status:** Delegated (2026-07-12)
 - **Risk:** medium · **Size:** medium (~2h)
 - **Depends on:** T02
 

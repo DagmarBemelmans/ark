@@ -6,10 +6,16 @@
 //
 
 use std::io::Read;
+use std::time::Duration;
 
 use anyhow::anyhow;
 
+mod lsp_connection;
 mod sidecar;
+
+/// How long to wait for the kernel to start its LSP server and report the port.
+/// Generous because the kernel first waits for R to finish initializing.
+const LSP_CONNECT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Parsed options for the `ark lsp` subcommand.
 pub struct Options {
@@ -68,19 +74,29 @@ pub fn parse_args(args: Vec<String>) -> anyhow::Result<ParsedArgs> {
 
 /// Run the standalone LSP server.
 ///
-/// Boots a full ark kernel as a child process and connects to it as a minimal
-/// Jupyter frontend. The LSP wiring lands in a later task; for now the bridge
-/// simply keeps the kernel alive until stdin reaches EOF, then shuts it down
-/// cleanly.
+/// Boots a full ark kernel as a child process, connects to it as a minimal
+/// Jupyter frontend, and starts ark's LSP server inside it over TCP. Bridging
+/// Zed's stdio to that TCP stream lands in a later task; for now the bridge
+/// holds the stream and keeps the kernel alive until stdin reaches EOF, then
+/// shuts down cleanly.
 pub fn run(options: Options) -> anyhow::Result<()> {
     let mut sidecar = sidecar::Sidecar::boot(options.log_file.as_deref())?;
     log::info!("kernel ready (kernel pid: {})", sidecar.child_pid());
 
-    // With no LSP frames to serve yet, block until the frontend closes our
-    // stdin, discarding anything sent in the meantime.
+    let lsp_stream = lsp_connection::start(&sidecar, LSP_CONNECT_TIMEOUT)?;
+    match lsp_stream.peer_addr() {
+        Ok(address) => log::info!("lsp connected (port {})", address.port()),
+        Err(err) => log::info!("lsp connected (port unknown: {err:?})"),
+    }
+
+    // With nothing yet bridging Zed's stdio to the LSP stream, block until the
+    // frontend closes our stdin, discarding anything sent in the meantime.
     wait_for_stdin_eof();
 
+    // Shut down in reverse order of setup: drop the LSP stream first, then the
+    // kernel sidecar.
     log::info!("stdin closed; shutting down kernel");
+    drop(lsp_stream);
     sidecar.shutdown()
 }
 

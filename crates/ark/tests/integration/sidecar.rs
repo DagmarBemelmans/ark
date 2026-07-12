@@ -5,11 +5,12 @@
 //
 //
 
-//! Integration test for the `ark lsp` sidecar kernel boot.
+//! Integration test for the `ark lsp` standalone bridge.
 //!
 //! Spawns `ark lsp` as a real process (not a thread), waits for it to boot a
-//! kernel child and log "kernel ready", then closes its stdin and asserts that
-//! both the bridge and the kernel child exit cleanly.
+//! kernel child, start ark's LSP server, and log "lsp connected", then closes
+//! its stdin and asserts that both the bridge and the kernel child exit
+//! cleanly.
 //!
 //! Like every other kernel test in this crate, this requires R to be installed:
 //! the sidecar boots a real R session.
@@ -29,7 +30,7 @@ const BOOT_TIMEOUT: Duration = Duration::from_secs(60);
 const EXIT_TIMEOUT: Duration = Duration::from_secs(10);
 
 #[test]
-fn test_sidecar_boots_and_shuts_down_cleanly() {
+fn test_standalone_lsp_connects_and_shuts_down_cleanly() {
     let dir = tempfile::tempdir().unwrap();
     let bridge_log = dir.path().join("bridge.log");
 
@@ -37,8 +38,9 @@ fn test_sidecar_boots_and_shuts_down_cleanly() {
         .arg("lsp")
         .arg("--log")
         .arg(&bridge_log)
-        // Ark's own log lines (including "kernel ready") only pass the filter
-        // when `ark` verbosity is requested; production leaves them quiet.
+        // Ark's own log lines (including "kernel ready" and "lsp connected")
+        // only pass the filter when `ark` verbosity is requested; production
+        // leaves them quiet.
         .env("RUST_LOG", "ark=info")
         .stdin(Stdio::piped())
         .stdout(Stdio::null())
@@ -46,8 +48,10 @@ fn test_sidecar_boots_and_shuts_down_cleanly() {
         .spawn()
         .unwrap();
 
-    // Wait for the bridge to log "kernel ready", failing fast if it dies first.
-    let log_contents = wait_for_kernel_ready(&mut bridge, &bridge_log, dir.path());
+    // Wait for the bridge to boot the kernel and connect to the LSP, failing
+    // fast if it dies first. "lsp connected" only appears after "kernel ready".
+    let log_contents = wait_for_log_marker(&mut bridge, &bridge_log, dir.path(), "lsp connected");
+    assert!(log_contents.contains("kernel ready"));
 
     let kernel_pid = parse_kernel_pid(&log_contents)
         .unwrap_or_else(|| panic!("Could not parse kernel pid from log:\n{log_contents}"));
@@ -72,30 +76,31 @@ fn test_sidecar_boots_and_shuts_down_cleanly() {
     }
 }
 
-/// Poll the bridge log until it contains "kernel ready", returning its contents.
-fn wait_for_kernel_ready(
+/// Poll the bridge log until it contains `marker`, returning its contents.
+fn wait_for_log_marker(
     bridge: &mut std::process::Child,
     bridge_log: &Path,
     dir: &Path,
+    marker: &str,
 ) -> String {
     let deadline = Instant::now() + BOOT_TIMEOUT;
 
     loop {
         if let Ok(Some(status)) = bridge.try_wait() {
             panic!(
-                "ark lsp exited before boot (status {status}).\n{}",
+                "ark lsp exited before {marker:?} (status {status}).\n{}",
                 diagnostics(dir)
             );
         }
 
         let log = std::fs::read_to_string(bridge_log).unwrap_or_default();
-        if log.contains("kernel ready") {
+        if log.contains(marker) {
             return log;
         }
 
         if Instant::now() >= deadline {
             let _ = bridge.kill();
-            panic!("Timed out waiting for kernel ready.\n{}", diagnostics(dir));
+            panic!("Timed out waiting for {marker:?}.\n{}", diagnostics(dir));
         }
 
         std::thread::sleep(Duration::from_millis(100));
