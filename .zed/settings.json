@@ -3,7 +3,7 @@
         "ark": {
             "binary": {
                 "path": "/home/dagmar/projects/ark/target/debug/ark",
-                "arguments": ["lsp", "--log", "/home/dagmar/projects/ark/tmp/ark-lsp.log"]
+                "arguments": ["lsp", "--log", "/home/dagmar/projects/ark/target/tmp/ark-lsp.log"]
             }
         },
         "rust-analyzer": {
