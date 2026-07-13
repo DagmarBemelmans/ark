@@ -51,5 +51,6 @@ Rules:
 - 2026-07-12 — Decisions 0002–0005 **Accepted**. T00 done. T01 (`ark lsp`
   skeleton) implemented and committed (`40f96503`). T02 (sidecar kernel boot)
   **Done** (committed `04f70346`). T03 (LSP comm + TCP connect) **Done**
-  (committed `94ce68ac`). T04 (stdio bridge + lifecycle) **delegated** to an
-  implementer.
+  (committed `94ce68ac`). T04 (stdio bridge + lifecycle) **Done** (committed
+  `6272fbed`) — the R-side bridge (T02–T04) is complete; `ark lsp` is a working
+  standalone stdio language server. Next: the Zed extension half (T05 Ready, T06).

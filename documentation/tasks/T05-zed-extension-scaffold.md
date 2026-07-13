@@ -1,6 +1,6 @@
 # T05 — Zed extension scaffold (highlighting only)
 
-- **Status:** Blocked on decisions 0004 + 0005 (can run parallel to T02–T04)
+- **Status:** Verified in Zed (2026-07-13) — highlighting/brackets/outline confirmed; awaiting commit. Note: current Zed builds extensions for `wasm32-wasip2` (not the `wasm32-wasip1` the docs mention); the target must be installed via rustup or the dev-install fails to compile.
 - **Risk:** low · **Size:** small-medium (~1-2h)
 - **Depends on:** decisions [0004](../decisions/0004-zed-extension-in-repo.md), [0005](../decisions/0005-grammar-and-queries-source.md)
 

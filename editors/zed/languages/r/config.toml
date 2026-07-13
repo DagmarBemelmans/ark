@@ -1,0 +1,4 @@
+name = "R"
+grammar = "r"
+path_suffixes = ["R", "r"]
+line_comments = ["# "]

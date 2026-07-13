@@ -1,0 +1,18 @@
+# This crate is intentionally NOT part of the ark cargo workspace. The empty
+# `[workspace]` table below makes it its own workspace root, so `cargo build`
+# at the repository root ignores it and Zed builds it on its own (to WASM)
+# during "install dev extension".
+[workspace]
+
+[package]
+name = "ark-r-zed"
+version = "0.0.1"
+edition = "2021"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+zed_extension_api = "0.7.0"

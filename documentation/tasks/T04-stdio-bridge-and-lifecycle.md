@@ -1,6 +1,6 @@
 # T04 — stdio↔TCP pump and full lifecycle
 
-- **Status:** Delegated (2026-07-12)
+- **Status:** Done (2026-07-12, committed `6272fbed`)
 - **Risk:** medium · **Size:** medium (~2-3h)
 - **Depends on:** T03
 
