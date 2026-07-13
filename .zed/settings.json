@@ -1,5 +1,11 @@
 {
     "lsp": {
+        "ark": {
+            "binary": {
+                "path": "/home/dagmar/projects/ark/target/debug/ark",
+                "arguments": ["lsp", "--log", "/home/dagmar/projects/ark/tmp/ark-lsp.log"]
+            }
+        },
         "rust-analyzer": {
             "initialization_options": {
                 "check": {
@@ -19,8 +25,7 @@
             "hard_tabs": false,
             "tab_size": 4,
             "format_on_save": "on",
-            "formatter": "language_server",
-            "language_servers": ["air"]
+            "language_servers": ["air", "ark"]
         }
     }
 }

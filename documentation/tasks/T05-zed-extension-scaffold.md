@@ -1,6 +1,6 @@
 # T05 — Zed extension scaffold (highlighting only)
 
-- **Status:** Verified in Zed (2026-07-13) — highlighting/brackets/outline confirmed; awaiting commit. Note: current Zed builds extensions for `wasm32-wasip2` (not the `wasm32-wasip1` the docs mention); the target must be installed via rustup or the dev-install fails to compile.
+- **Status:** Done (committed `7b607425`, 2026-07-13). Notes from verification: current Zed builds extensions for `wasm32-wasip2` (not the `wasm32-wasip1` the docs mention) — the target must be installed via rustup or the dev-install fails to compile; and dev-install writes the compiled grammar into `editors/zed/grammars/` (now gitignored).
 - **Risk:** low · **Size:** small-medium (~1-2h)
 - **Depends on:** decisions [0004](../decisions/0004-zed-extension-in-repo.md), [0005](../decisions/0005-grammar-and-queries-source.md)
 

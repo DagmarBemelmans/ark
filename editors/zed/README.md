@@ -4,34 +4,68 @@ A [Zed](https://zed.dev) extension that adds editing support for the R language,
 intended to be backed by [Ark](https://github.com/posit-dev/ark)'s language
 server.
 
-## Status
-
-**Highlighting only (task T05).** This build contributes:
+## What this contributes
 
 - the [`r-lib/tree-sitter-r`](https://github.com/r-lib/tree-sitter-r) grammar,
 - syntax highlighting, bracket matching, indentation, and an outline for `.R`
-  and `.r` files.
+  and `.r` files,
+- the **Ark language server** — Zed launches `ark lsp` for completions, hover
+  documentation, diagnostics, and jump-to-definition.
 
-The language server (launching `ark` in LSP mode for completions,
-diagnostics, jump-to-definition, …) is **not wired up yet** — it arrives in task
-T06. Until then, opening an R file and checking the language server logs will
-show an explanatory error from the extension; that is expected.
+## Configuration
 
-If you want to experiment with the server before T06 lands, point Zed at an
-`ark` binary yourself in your Zed `settings.json`:
+The extension finds the `ark` binary in one of two ways:
+
+1. **A Zed setting** (`lsp.ark.binary`) — takes priority. Point it at the `ark`
+   you built. Assuming this repository is checked out at `/path/to/ark`, add the
+   following to your Zed `settings.json` (command palette → **`zed: open
+   settings`**):
+
+   ```jsonc
+   {
+     "lsp": {
+       "ark": {
+         "binary": {
+           "path": "/path/to/ark/target/debug/ark",
+           "arguments": ["lsp"]
+         }
+       }
+     }
+   }
+   ```
+
+   `path` and `arguments` are both honored as written; you can also add a
+   `binary.env` object of extra environment variables.
+
+2. **`ark` on your `$PATH`** — if no `lsp.ark.binary.path` is set, the extension
+   runs `ark lsp` using whichever `ark` your shell finds. Put the build on your
+   PATH, e.g. `export PATH="/path/to/ark/target/debug:$PATH"`. The server
+   inherits your shell environment, so `PATH` and `R_HOME` resolve the same R
+   you get in a terminal.
+
+If neither is available, Zed's language-server log shows an error explaining how
+to build `ark` or set the override.
+
+### Checking it's alive
+
+Open a `.R` file, then run **`zed: open language server logs`** from the command
+palette and pick **Ark**. A healthy server logs its LSP handshake there; the
+error message above appears instead if the binary could not be found.
+
+### Logging to a file (`--log`)
+
+`ark lsp` writes its diagnostics to stderr by default. To capture them to a
+file, add `--log` to `arguments`:
 
 ```jsonc
-{
-  "lsp": {
-    "ark": {
-      "binary": {
-        "path": "/absolute/path/to/ark",
-        "arguments": ["lsp"]
-      }
-    }
-  }
-}
+"arguments": ["lsp", "--log", "/tmp/ark-lsp.log"]
 ```
+
+The bridge process writes to that file, and the R kernel it manages writes to
+`kernel.log` in the **same directory** (here `/tmp/kernel.log`). Without `--log`,
+the bridge logs to stderr (visible in Zed's language-server log) and the kernel
+log goes to a private temp directory. Run `ark lsp --help` for the full option
+list. Note that `stdout` is reserved for LSP frames — logs never go there.
 
 ## Developing / installing locally
 
@@ -42,10 +76,14 @@ If you want to experiment with the server before T06 lands, point Zed at an
    log, `~/.local/share/zed/logs/Zed.log`).
 2. In Zed, open the command palette and run **`zed: install dev extension`**.
 3. Select this directory (`editors/zed/`).
-4. Open any `.R` file — highlighting, bracket matching, and the outline panel
-   should work.
-5. After editing the extension, run **`zed: reload extensions`** (or reinstall
-   the dev extension) to pick up changes.
+4. Build `ark` (`cargo build` at the repository root) and configure the binary
+   as described under [Configuration](#configuration).
+5. Open any `.R` file — highlighting, bracket matching, and the outline panel
+   should work, and the Ark language server should provide completions, hover,
+   diagnostics, and jump-to-definition.
+6. After editing the extension, run **`zed: reload extensions`** (or reinstall
+   the dev extension) to pick up changes. After rebuilding `ark`, restart the
+   language server (or the Zed window) so Zed relaunches the new binary.
 
 This extension lives outside the Ark cargo workspace (its `Cargo.toml` has an
 empty `[workspace]` table), so a plain `cargo build` at the repository root does

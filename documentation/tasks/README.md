@@ -12,8 +12,8 @@ Each `TNN-*.md` file is a **self-contained brief** for an implementer model
 | T02 | [Sidecar kernel boot](T02-sidecar-kernel-boot.md) | ~~T01~~ ✓, ~~0002 accepted~~ ✓ | **high** | Done (committed `04f70346`) |
 | T03 | [LSP comm + TCP connect](T03-lsp-comm-and-tcp-connect.md) | ~~T02~~ ✓ | medium | Done (committed `94ce68ac`) |
 | T04 | [stdio bridge + lifecycle](T04-stdio-bridge-and-lifecycle.md) | ~~T03~~ ✓ | medium | Done (committed `6272fbed`) |
-| T05 | [Zed extension scaffold](T05-zed-extension-scaffold.md) | ~~0004+0005 accepted~~ ✓ | low | In review |
-| T06 | [Zed language-server wiring](T06-zed-language-server-wiring.md) | T04, T05 | low | Blocked |
+| T05 | [Zed extension scaffold](T05-zed-extension-scaffold.md) | ~~0004+0005 accepted~~ ✓ | low | Done (committed `7b607425`) |
+| T06 | [Zed language-server wiring](T06-zed-language-server-wiring.md) | ~~T04~~ ✓, ~~T05~~ ✓ | low | In review |
 | T07 | [Docs, troubleshooting, polish](T07-docs-and-polish.md) | T06 | low | Blocked |
 
 Statuses: `Blocked` → `Ready` → `Delegated` → `In review` → `Done`.

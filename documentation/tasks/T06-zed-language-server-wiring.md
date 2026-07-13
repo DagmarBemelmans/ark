@@ -1,6 +1,6 @@
 # T06 — Wire the Zed extension to `ark lsp`
 
-- **Status:** Blocked on T04 + T05
+- **Status:** In review (2026-07-13) — implementer finished; awaiting Dagmar's in-Zed acceptance checks + commit
 - **Risk:** low · **Size:** small (~1h)
 - **Depends on:** T04 (a working `ark lsp`), T05 (loadable extension)
 
